@@ -1,0 +1,172 @@
+﻿@{
+    ViewBag.Title = "Hochzeit Mich & Alex!";
+}
+
+<script type="text/javascript">
+
+    function fileSelected() {
+
+        var count = document.getElementById('fileToUpload').files.length;
+        document.getElementById('details').innerHTML = '';
+
+        for (var index = 0; index < count; index++) {
+            var file = document.getElementById('fileToUpload').files[index];
+            var fileSize = 0;
+            if (file.size > 1024 * 1024) {
+                fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB';
+            } else {
+                fileSize = (Math.round(file.size * 100 / 1024) / 100).toString() + 'KB';
+            }
+
+            document.getElementById('details').innerHTML += 'Name: ' + file.name + '<br>Size: ' + fileSize + '<br>Type: ' + file.type;
+            document.getElementById('details').innerHTML += '<p>';
+        }
+
+        if (count > 0) {
+            document.getElementById('submitBtn').disabled = false;
+        }
+    }
+
+    function fileSelectedShrink() {
+
+      // Check number of selected files for upload...
+      var count = document.getElementById('fileToUpload').files.length;
+
+      // Reset file details text to empty
+      document.getElementById('details').innerHTML = '';
+
+      // If no file is selected, disable submit button and return
+      if (count <= 0)
+      {
+        document.getElementById('submitBtn').disabled = true;
+        return;
+      }
+
+      // get the first file from the input field
+      var file = document.getElementById('fileToUpload').files[0];
+      var imageType = /image.*/;
+
+      // File is of type image...
+      if (file.type.match(imageType)) {
+
+        var fileSize = 0;
+        if (file.size > 1024 * 1024) {
+          fileSize = (Math.round(file.size * 100 / (1024 * 1024)) / 100).toString() + 'MB';
+        } else {
+          fileSize = (Math.round(file.size * 100 / 1024) / 100).toString() + 'KB';
+        }
+
+        // Use FileReader to load file
+        var reader = new FileReader();
+
+        reader.onload = function (e) {
+
+          // create image
+          var img = new Image();
+          img.src = reader.result;
+          img.onload = function () {
+
+            // Max. height / width to resize to...
+            var MAX_HEIGHT = 1500;
+            var MAX_WIDTH = 1500;
+
+            // Set the image quality to save (JPG compression)
+            var IMAGE_QUALITY = 0.8;
+
+            var width = img.width;
+            var height = img.height;
+
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+
+            // create canvas to draw image in it...
+            var canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+
+            var ctx = canvas.getContext("2d");
+
+            // draw image
+            ctx.drawImage(img, 0, 0, width, height);
+            var mpImg = new MegaPixImage(img);
+
+            // get image orientation from meta data
+            getImageOrientation(file, function (imgOrientation) {
+
+              // render image in canvas with correct orientation
+              mpImg.render(canvas, { width: width, height: height, orientation: imgOrientation });
+
+              // get result image using JPG compression...
+              var dataurl = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
+
+              // get new filesize of shrinked image (approx.)
+              var head = 'data:image/jpeg;base64,';
+              var imgFileSize = Math.round((dataurl.length - head.length) * 3 / 4);
+
+              var newFileSize = 0;
+              if (imgFileSize > 1024 * 1024) {
+                newFileSize = (Math.round(imgFileSize * 100 / (1024 * 1024)) / 100).toString() + 'MB';
+              } else {
+                newFileSize = (Math.round(imgFileSize * 100 / 1024) / 100).toString() + 'KB';
+              }
+
+              document.getElementById('details').innerHTML = 'Jetzt Foto hochladen:<p>';
+              //document.getElementById('details').innerHTML = 'Name: ' + file.name + '<br>Size: ' + fileSize + '<br>Type: ' + file.type + '<br>' + img.width.toString() + ' x ' + img.height.toString() + 'px';
+              //document.getElementById('details').innerHTML += '<br><br>Shrinked to: ' + width.toString() + ' x ' + height.toString() + 'px<br>';
+              //document.getElementById('details').innerHTML += '-- New Size: ~ ' + newFileSize;
+              //document.getElementById('details').innerHTML += '<p>';
+
+              // set data content - resized/shrinked image
+              $('#shrinkedImage').val(dataurl);
+
+              $('#fileName').val(file.name);
+            });
+          }
+        }
+
+        document.getElementById('details').innerHTML = 'Bitte kurz warten...<p>';
+
+        reader.readAsDataURL(file);
+
+        // TODO go on processing here.. note the submit button enabled state..
+        document.getElementById('submitBtn').disabled = false;
+      } else {
+          document.getElementById('submitBtn').disabled = true;
+      }
+    }
+    function getImageOrientation(file, callBack) {
+      EXIF.getData(file, function () {
+        return callBack(EXIF.getAllTags(file).Orientation);
+      });
+    }
+</script>
+
+<div>
+    @using (Html.BeginForm("UploadImages", "Home", FormMethod.Post, new { enctype = "multipart/form-data" }))
+    {
+        <div class="form-group" style="margin-top: 20px; margin-bottom: 20px">
+            <label for="fileToUpload">Foto zum Hochladen auswählen</label><br />
+            <input type="file" id="fileToUpload" onchange="fileSelectedShrink();" name="fileToUpload" accept="image/*" />
+            <input type="hidden" id="shrinkedImage" name="shrinkedImage" />
+            <input type="hidden" id="fileName" name="fileName" />
+        </div>
+        <div class="form-group">
+            <span id="details"></span>
+        </div>
+        <div class="form-group">
+            <input type="submit" id="submitBtn" disabled="disabled" value="Hochladen" class="btn btn-primary btn-lg btn-block" />
+        </div>
+        <div class="form-group">
+            <div id="progress"></div>
+        </div>
+    }
+</div>   
